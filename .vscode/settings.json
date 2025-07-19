@@ -1,0 +1,17 @@
+{
+  // Use Black to format Python code
+  "python.formatting.provider": "black",
+  "editor.formatOnSave": true,
+
+  // Enable Flake8 linting and ensure linting is on globally
+  "python.linting.enabled": true,
+  "python.linting.flake8Enabled": true,
+
+  // (Optional) Sort imports automatically using isort — you need the extension or run as part of formatter
+  "editor.codeActionsOnSave": {
+    "source.organizeImports": "explicit"
+  },
+
+  // Display test results in the gutter when using pytest extension
+  "python.testing.pytestEnabled": true
+}

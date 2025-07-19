@@ -1,0 +1,52 @@
+name: Daily Compliance Audit
+
+on:
+  workflow_dispatch: {}
+  schedule:
+    - cron: "0 8 * * *"  # 08:00 UTC daily (adjust as needed)
+
+jobs:
+  audit:
+    name: Run compliance scripts & tests
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check out code
+        uses: actions/checkout@v4
+
+      - name: Set up Python 3.11
+        uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+
+      - name: Install dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install -r requirements.txt
+          pip install -r requirements-dev.txt
+
+      - name: Run unit tests
+        run: pytest -q
+
+      - name: Execute compliance scripts
+        env:
+          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          AWS_DEFAULT_REGION: us-east-1
+        run: |
+          python scripts/fafo_checker.py || true
+          python scripts/guardduty_findings_summary.py || true
+          python scripts/config_noncompliant_rules.py || true
+          python scripts/unused_iam_access_keys.py || true
+
+      - name: Upload Excel evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: compliance-evidence
+          path: |
+            *.xlsx
+            guardduty_findings_summary.xlsx
+            config_noncompliant_rules.xlsx
+            iam_unused_access_keys.xlsx
+            iam_users_without_mfa.xlsx

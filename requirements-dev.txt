@@ -1,0 +1,6 @@
+# Development-only dependencies (not required in production runtime)
+black==24.4.2
+flake8==7.0.0
+isort==5.13.2
+pytest==8.4.1
+moto[all]==5.0.15
