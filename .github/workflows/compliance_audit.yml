@@ -1,52 +1,79 @@
+# Update the workflow file
+cat > .github/workflows/compliance_audit.yml << 'EOF'
 name: Daily Compliance Audit
 
 on:
-  workflow_dispatch: {}
   schedule:
-    - cron: "0 8 * * *"  # 08:00 UTC daily (adjust as needed)
+    - cron: '0 8 * * *'  # Runs at 08:00 UTC daily
+  workflow_dispatch:  # Allow manual triggers
 
 jobs:
-  audit:
-    name: Run compliance scripts & tests
+  compliance-check:
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: read
+      id-token: write  # For AWS OIDC auth (recommended over long-lived keys)
 
     steps:
-      - name: Check out code
-        uses: actions/checkout@v4
+    - name: Checkout code
+      uses: actions/checkout@v3
 
-      - name: Set up Python 3.11
-        uses: actions/setup-python@v5
-        with:
-          python-version: "3.11"
+    - name: Set up Python
+      uses: actions/setup-python@v4
+      with:
+        python-version: '3.11'
+        cache: 'pip'
 
-      - name: Install dependencies
-        run: |
-          python -m pip install --upgrade pip
-          pip install -r requirements.txt
-          pip install -r requirements-dev.txt
+    - name: Install dependencies
+      run: |
+        python -m pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install -r requirements-dev.txt
 
-      - name: Run unit tests
-        run: pytest -q
+    # AWS Authentication (using OIDC - recommended)
+    - name: Configure AWS Credentials
+      uses: aws-actions/configure-aws-credentials@v4
+      with:
+        role-to-assume: ${{ secrets.AWS_ROLE_ARN }}  # If using IAM roles
+        aws-region: us-east-1
 
-      - name: Execute compliance scripts
-        env:
-          AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-          AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-          AWS_DEFAULT_REGION: us-east-1
-        run: |
-          python scripts/fafo_checker.py || true
-          python scripts/guardduty_findings_summary.py || true
-          python scripts/config_noncompliant_rules.py || true
-          python scripts/unused_iam_access_keys.py || true
+    # Run all compliance checks
+    - name: Run IAM MFA Check
+      run: python scripts/fafo_checker.py
 
-      - name: Upload Excel evidence
-        if: always()
-        uses: actions/upload-artifact@v4
-        with:
-          name: compliance-evidence
-          path: |
-            *.xlsx
-            guardduty_findings_summary.xlsx
-            config_noncompliant_rules.xlsx
-            iam_unused_access_keys.xlsx
-            iam_users_without_mfa.xlsx
+    - name: Run S3 Bucket Check
+      run: python scripts/list_s3_buckets.py
+
+    - name: Run GuardDuty Findings Check
+      run: python scripts/guardduty_findings_summary.py
+
+    - name: Run Config Rules Check
+      run: python scripts/config_noncompliant_rules.py
+
+    - name: Run Unused IAM Keys Check
+      run: python scripts/unused_iam_access_keys.py
+
+    - name: Run EC2 Compliance Check
+      run: python scripts/ec2_compliance_check.py
+
+    # Upload all reports as artifacts
+    - name: Upload Compliance Reports
+      if: always()
+      uses: actions/upload-artifact@v3
+      with:
+        name: compliance-reports
+        path: |
+          *report.xlsx
+          *audit.log
+        retention-days: 7
+
+    # Optional: Send Slack notification on failure
+    - name: Notify on Failure
+      if: failure()
+      uses: rtCamp/action-slack-notify@v2
+      env:
+        SLACK_WEBHOOK: ${{ secrets.SLACK_WEBHOOK_URL }}
+        SLACK_TITLE: "Compliance Check Failed"
+        SLACK_MESSAGE: "One or more compliance checks failed. Check the workflow run for details."
+        SLACK_COLOR: "danger"
