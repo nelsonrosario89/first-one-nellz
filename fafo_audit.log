@@ -1,8 +1,0 @@
-2025-07-19 15:15:16,445 - INFO - === Starting FAFO MFA Compliance Check ===
-2025-07-19 15:15:16,688 - INFO - Found credentials in shared credentials file: ~/.aws/credentials
-2025-07-19 15:15:17,159 - INFO - Fetching IAM user list via pagination …
-2025-07-19 15:15:17,752 - INFO - Total IAM users without MFA: 0
-2025-07-19 15:15:17,769 - WARNING - No non-compliant users found – Excel will contain headers only.
-2025-07-19 15:15:18,183 - INFO - Excel report saved: iam_users_without_mfa.xlsx
-2025-07-19 15:15:18,184 - INFO - Completed in 1.74 seconds
-2025-07-19 15:15:18,184 - INFO - === FAFO Compliance Check Complete ===
