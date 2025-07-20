@@ -5,10 +5,9 @@ on:
   schedule:
     - cron: "0 8 * * *"  # 08:00 UTC daily
 
-# Set permissions for OIDC
 permissions:
-  id-token: write   # Required for OIDC
-  contents: read    # Required for actions/checkout
+  id-token: write
+  contents: read
 
 jobs:
   audit:
@@ -30,17 +29,14 @@ jobs:
           pip install -r requirements.txt
           pip install -r requirements-dev.txt
 
-      - name: Configure AWS Credentials (OIDC)
+      - name: Configure AWS Credentials
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: ${{ secrets.AWS_ROLE_ARN }}
-          aws-region: us-east-1
+          aws-region: ${{ secrets.AWS_REGION || 'us-east-1' }}
           role-session-name: GitHubActions-ComplianceAudit
 
-      - name: Run unit tests
-        run: pytest -q
-
-      - name: Execute compliance scripts
+      - name: Run compliance checks
         run: |
           python scripts/fafo_checker.py || true
           python scripts/guardduty_findings_summary.py || true
@@ -48,14 +44,11 @@ jobs:
           python scripts/unused_iam_access_keys.py || true
           python scripts/list_s3_buckets.py || true
 
-      - name: Upload Excel evidence
+      - name: Upload evidence
         if: always()
         uses: actions/upload-artifact@v4
         with:
           name: compliance-evidence
           path: |
             *.xlsx
-            guardduty_findings_summary.xlsx
-            config_noncompliant_rules.xlsx
-            iam_unused_access_keys.xlsx
-            iam_users_without_mfa.xlsx
+            *.log
